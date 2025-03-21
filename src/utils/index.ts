@@ -5,6 +5,17 @@ export default async function convertMarkdownToTextLayer(markdownText: string) {
     let yOffset = 0;
     const GAP = 30;
 
+    const frame = figma.createFrame();
+    frame.layoutMode = "VERTICAL";
+    frame.verticalPadding = 16;
+    frame.horizontalPadding = 16;
+    frame.layoutSizingHorizontal = "HUG";
+    frame.layoutSizingVertical = "HUG";
+    frame.name = "From MD";
+
+
+    debugger;
+
     for (const token of tokens) {
         if (token.type === "heading") {
             const textNode = figma.createText();
@@ -13,12 +24,15 @@ export default async function convertMarkdownToTextLayer(markdownText: string) {
             textNode.characters = token.tokens?.map(getTextFromToken).join(" ") || "";
             textNode.y = yOffset;
             yOffset += GAP;
+            frame.appendChild(textNode);
         } else if (token.type === "paragraph") {
-            await handleTextToken(token, yOffset);
+            const node = await handleTextToken(token, yOffset);
+            frame.appendChild(node);
             yOffset += GAP;
         } else if (token.type === "list") {
             for (const item of token.items) {
-                await handleTextToken(item, yOffset, "• ");
+                const node = await handleTextToken(item, yOffset, "- ");
+                frame.appendChild(node)
                 yOffset += GAP;
             }
         } else if (token.type === "space") {
@@ -29,7 +43,7 @@ export default async function convertMarkdownToTextLayer(markdownText: string) {
     figma.closePlugin("Conversion Done");
 }
 
-async function handleTextToken(token: any, yOffset: number, prefix: string = ""): Promise<void> {
+async function handleTextToken(token: any, yOffset: number, prefix: string = ""): Promise<TextNode> {
     const textNode = figma.createText();
     let textContent = prefix;
     let fontRanges: { start: number; end: number; font: FontName }[] = [];
@@ -63,6 +77,8 @@ async function handleTextToken(token: any, yOffset: number, prefix: string = "")
     }
 
     textNode.y = yOffset;
+
+    return textNode;
 }
 
 
