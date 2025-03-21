@@ -1,29 +1,81 @@
-import { marked } from "marked";
+import { marked, Token } from "marked";
 
-async function convertMarkdownToTextLayer(markdownText: string) {
+export default async function convertMarkdownToTextLayer(markdownText: string) {
     const tokens = marked.lexer(markdownText);
     let yOffset = 0;
-    const GAP = 10;
+    const GAP = 30;
 
     for (const token of tokens) {
-        if(token.type === "heading") {
+        if (token.type === "heading") {
             const textNode = figma.createText();
-            await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-            textNode.characters = token.text;
-            textNode.fontSize = 24 - (token.depth * 4);
-            textNode.x = 0;
+            await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+            textNode.fontName = { family: "Inter", style: "Bold" };
+            textNode.characters = token.tokens?.map(getTextFromToken).join(" ") || "";
             textNode.y = yOffset;
-            yOffset += textNode.height + GAP;
-        }else if(token.type === "paragraph") {
-            const textNode = figma.createText();
-            await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-            textNode.characters = token.text;
-            textNode.x = 0;
-            textNode.y = yOffset;
-            yOffset += textNode.height + GAP;
+            yOffset += GAP;
+        } else if (token.type === "paragraph") {
+            await handleTextToken(token, yOffset);
+            yOffset += GAP;
+        } else if (token.type === "list") {
+            for (const item of token.items) {
+                await handleTextToken(item, yOffset, "• ");
+                yOffset += GAP;
+            }
+        } else if (token.type === "space") {
+            yOffset += GAP / 2;
         }
-
-        // TODO: Add support for markdown lists and tables if possible.
     }
 
+    figma.closePlugin("Conversion Done");
+}
+
+async function handleTextToken(token: any, yOffset: number, prefix: string = ""): Promise<void> {
+    const textNode = figma.createText();
+    let textContent = prefix;
+    let fontRanges: { start: number; end: number; font: FontName }[] = [];
+
+    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+    await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+    await figma.loadFontAsync({ family: "Inter", style: "Italic" });
+
+    let cursor = prefix.length;
+
+    for (const inlineToken of token.tokens || []) {
+        if (["text", "strong", "em", "codespan"].includes(inlineToken.type)) {
+            const text = inlineToken.text || "";
+            const start = cursor;
+            const end = start + text.length;
+
+            let fontStyle: FontName = { family: "Inter", style: "Regular" };
+            if (inlineToken.type === "strong") fontStyle = { family: "Inter", style: "Bold" };
+            if (inlineToken.type === "em") fontStyle = { family: "Inter", style: "Italic" };
+
+            textContent += text;
+            fontRanges.push({ start, end, font: fontStyle });
+
+            cursor = end;
+        }
+    }
+
+    textNode.characters = textContent;
+    for (const range of fontRanges) {
+        textNode.setRangeFontName(range.start, range.end, range.font);
+    }
+
+    textNode.y = yOffset;
+}
+
+
+
+function getTextFromToken(token: Token) {
+    let str = "";
+    if (token.type === "text" || token.type === "strong" || token.type === "em" || token.type === "codespan") {
+        str += token.text;
+    }
+
+    return str;
+}
+
+function isText(token: Token){
+    return token.type === "text" || token.type === "strong" || token.type === "em" || token.type === "codespan"
 }

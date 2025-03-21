@@ -6,26 +6,30 @@ import {
   render,
   VerticalSpace
 } from '@create-figma-plugin/ui'
-import { emit } from '@create-figma-plugin/utilities'
+import { emit, once } from '@create-figma-plugin/utilities'
 import { h, RefObject } from 'preact'
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
-import { highlight, languages } from 'prismjs'
+import {highlight, languages } from 'prismjs'
 import Editor from 'react-simple-code-editor'
 
 import styles from './styles.css'
-import { InsertCodeHandler } from './types'
+import { FromSelection, InsertCodeHandler, PasteFromText } from './types'
 
 function Plugin() {
-  const [code, setCode] = useState(`function add(a, b) {\n  return a + b;\n}`)
+  const [code, setCode] = useState("")
   const containerElementRef : RefObject<HTMLDivElement> = useRef(null)
-  const handleInsertCodeButtonClick = useCallback(
-    function () {
-      emit<InsertCodeHandler>('INSERT_CODE', code)
-    },
-    [code]
-  )
+
+  const handleInsertCodeButtonClick = useCallback(() => {
+      emit<PasteFromText>('PAST_FROM_TEXT', code)
+    }, [code])
+
+  useEffect(() => {
+    once<FromSelection>("FROM_SELECTION", setCode)
+  }, []);
+
+  // TODO: Move to custom hook
   // Patch to make `react-simple-code-editor` compatible with Preact
-  useEffect(function () {
+  useEffect(() => {
     const containerElement = containerElementRef.current
     if (containerElement === null) {
       return
@@ -42,15 +46,14 @@ function Plugin() {
     if (textAreaElement.nextElementSibling !== preElement) {
       textAreaElement.after(preElement)
     }
-  }, [code])
+  }, [code]);
+
   return (
     <Container space="medium">
       <VerticalSpace space="small" />
       <div class={styles.container} ref={containerElementRef}>
         <Editor
-          highlight={function (code: string) {
-            return highlight(code, languages.js, 'js')
-          }}
+          highlight={(code: string) => highlight(code, languages.markup, 'markup')}
           onValueChange={setCode}
           preClassName={styles.editor}
           textareaClassName={styles.editor}
@@ -58,8 +61,8 @@ function Plugin() {
         />
       </div>
       <VerticalSpace space="large" />
-      <Button fullWidth onClick={handleInsertCodeButtonClick}>
-        Insert Code
+      <Button fullWidth disabled={!code.length} onClick={handleInsertCodeButtonClick}>
+        Markdown to Figma!
       </Button>
       <VerticalSpace space="small" />
     </Container>
